@@ -17,14 +17,51 @@ const field = "border-border bg-background rounded-2xl min-h-11 w-full border px
     <div class="bg-card border-border rounded-panel mt-6 overflow-x-auto border">
       <table class="w-full text-left text-sm"><thead class="border-border text-muted-foreground border-b text-xs uppercase"><tr><th class="px-4 py-3">{t.name}</th><th class="px-4 py-3">{t.order}</th><th class="px-4 py-3">{t.actions}</th></tr></thead><tbody data-category-list></tbody></table>
     </div>
-    <form data-category-form hidden class="bg-card border-border rounded-panel mt-8 space-y-5 border p-6">
-      <label class="block">{t.categorySlug}<input name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="120" class={field} /></label>
-      <label class="block">{t.name}<input name="name" required maxlength="120" class={field} /></label>
-      <label class="block">{t.description}<textarea name="description" maxlength="2000" rows="3" class={field}></textarea></label>
-      <label class="block">{t.order}<input name="order" type="number" step="1" value="0" required class={field} /></label>
-      <label class="block">{t.accent}<select name="accent" class={field}><option value="coral">{t.accentCoral}</option><option value="reef">{t.accentReef}</option><option value="ink">{t.accentInk}</option></select></label>
+    <form data-category-form hidden class="bg-card border-border rounded-panel mt-8 space-y-5 border p-6" action="https://api.bettercms.ai/api/v1/forms/public/2577372d-a69c-4ca1-8978-537e173bff92/submissions" method="post" data-bcms-form="2577372d-a69c-4ca1-8978-537e173bff92" data-bcms-form-success="Thank you for your submission!">
+      <label class="block" data-bcms-form-field="slug">{t.categorySlug}<input name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="120" class={field} /></label>
+      <label class="block" data-bcms-form-field="name">{t.name}<input name="name" required maxlength="120" class={field} /></label>
+      <label class="block" data-bcms-form-field="description">{t.description}<textarea name="description" maxlength="2000" rows="3" class={field}></textarea></label>
+      <label class="block" data-bcms-form-field="order">{t.order}<input name="order" type="number" step="1" value="0" required class={field} /></label>
+      <label class="block" data-bcms-form-field="accent">{t.accent}<select name="accent" class={field}><option value="coral">{t.accentCoral}</option><option value="reef">{t.accentReef}</option><option value="ink">{t.accentInk}</option></select></label>
       <div class="flex flex-wrap gap-3"><button type="submit" class="bg-primary text-primary-foreground rounded-pill min-h-11 px-5 font-semibold">{t.save}</button><button type="button" data-category-delete hidden class="border-accent rounded-pill min-h-11 border px-5 font-semibold">{t.deleteCategory}</button></div>
+    <p class="bcms-form-msg" hidden></p>
     </form>
+    <script is:inline>
+function bcmsPhone(cc,raw,trunk){var d=String(raw||'').trim();if(!d)return '';if(d.charAt(0)==='+'){var i=d.replace(/D/g,'');return i?'+'+i:'';}if(!cc)return d;var n=d.replace(/D/g,'');if(trunk&&n.charAt(0)==='0')n=n.slice(1);return n?'+'+cc+n:'';}
+document.querySelectorAll('form[data-bcms-form]').forEach(function(f){
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    var msg=f.querySelector('.bcms-form-msg');
+    var data={};
+    // A checkboxes group posts one entry per checked box under the SAME name; the old
+    // one-at-a-time assignment kept only the last, so "pick many" delivered one answer.
+    // One checked box still arrives as a scalar — FormData cannot tell a group from a
+    // lone field — which is exactly why lib/forms/validate.ts's chosenValues() accepts
+    // both an array and a comma string.
+    new FormData(f).forEach(function(v,k){
+      if(k==='cf-turnstile-response')return;
+      if(Object.prototype.hasOwnProperty.call(data,k))data[k]=(Array.isArray(data[k])?data[k]:[data[k]]).concat(v);
+      else data[k]=v;
+    });
+    // Country-picker phone fields post ONE key. The __country select is scaffolding: it is
+    // composed into the field's own value here, AFTER collection, so a showIf that points at a
+    // phone key still compares the raw digits. Then it is removed from the body.
+    f.querySelectorAll('select[name$="__country"]').forEach(function(sel){
+      var k=sel.name.slice(0,-9);
+      var o=sel.options[sel.selectedIndex];
+      data[k]=bcmsPhone(o?(o.getAttribute('data-cc')||''):'',data[k],o?o.getAttribute('data-trunk')==='1':false);
+      delete data[k+'__country'];
+    });
+    var body={data:data};
+    var tok=f.querySelector('[name="cf-turnstile-response"]');
+    if(tok&&tok.value)body['cf-turnstile-response']=tok.value;
+    fetch(f.action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){return r.ok;})
+      .then(function(ok){if(msg){msg.hidden=false;msg.textContent=ok?(f.getAttribute('data-bcms-form-success')||'Thanks! Your submission was received.'):'Sorry, something went wrong.';}if(ok)f.reset();})
+      .catch(function(){if(msg){msg.hidden=false;msg.textContent='Sorry, something went wrong.';}});
+  });
+});
+</script>
   </section>
   <script>import "@components/Sections/BackOffice/categories";</script>
 </AdminLayout>

@@ -22,22 +22,59 @@ const field = "border-border bg-background rounded-2xl min-h-11 w-full border px
             <th class="px-4 py-3">{t.actions}</th>
           </tr></thead><tbody data-articles></tbody></table>
         </div></div>
-      <form data-article-form hidden class="bg-card border-border rounded-panel min-w-0 space-y-4 border p-6">
-        <label class="block">{t.slug}<input name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="120" class={field} /></label>
-        <label class="block">{t.title}<input name="title" required class={field} /></label>
-        <label class="block">{t.description}<textarea name="description" required rows="2" class={field}></textarea></label>
-        <label class="block">{t.date}<input name="pubDate" required class={field} /></label>
-        <div class="grid gap-4 sm:grid-cols-2"><label>{t.author}<select name="author" required class={field}></select></label><label>{t.topic}<select name="topic" required class={field}></select></label></div>
-        <label class="block">{t.tags}<input name="tags" class={field} /></label>
-        <label class="block">{t.cover}<select name="cover" class={field}></select></label>
-        <label class="block">{t.coverAlt}<input name="coverAlt" class={field} /></label>
-        <div class="flex flex-wrap gap-5"><label class="flex min-h-11 items-center gap-2"><input type="checkbox" name="draft" />{t.draft}</label><label class="flex min-h-11 items-center gap-2"><input type="checkbox" name="featured" />{t.featured}</label></div>
-        <label class="block">{t.body}<textarea name="body" rows="18" required class={`${field} font-mono text-sm`}></textarea></label>
+      <form data-article-form hidden class="bg-card border-border rounded-panel min-w-0 space-y-4 border p-6" action="https://api.bettercms.ai/api/v1/forms/public/a2e0e2b2-3b63-44c1-b7e8-f45488acfb73/submissions" method="post" data-bcms-form="a2e0e2b2-3b63-44c1-b7e8-f45488acfb73" data-bcms-form-success="Thank you for your submission!">
+        <label class="block" data-bcms-form-field="slug">{t.slug}<input name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="120" class={field} /></label>
+        <label class="block" data-bcms-form-field="title">{t.title}<input name="title" required class={field} /></label>
+        <label class="block" data-bcms-form-field="description">{t.description}<textarea name="description" required rows="2" class={field}></textarea></label>
+        <label class="block" data-bcms-form-field="pubDate">{t.date}<input name="pubDate" required class={field} /></label>
+        <div class="grid gap-4 sm:grid-cols-2"><label data-bcms-form-field="author">{t.author}<select name="author" required class={field}></select></label><label data-bcms-form-field="topic">{t.topic}<select name="topic" required class={field}></select></label></div>
+        <label class="block" data-bcms-form-field="tags">{t.tags}<input name="tags" class={field} /></label>
+        <label class="block" data-bcms-form-field="cover">{t.cover}<select name="cover" class={field}></select></label>
+        <label class="block" data-bcms-form-field="coverAlt">{t.coverAlt}<input name="coverAlt" class={field} /></label>
+        <div class="flex flex-wrap gap-5"><label class="flex min-h-11 items-center gap-2" data-bcms-form-field="draft"><input type="checkbox" name="draft" />{t.draft}</label><label class="flex min-h-11 items-center gap-2" data-bcms-form-field="featured"><input type="checkbox" name="featured" />{t.featured}</label></div>
+        <label class="block" data-bcms-form-field="body">{t.body}<textarea name="body" rows="18" required class={`${field} font-mono text-sm`}></textarea></label>
         <button type="button" data-delete hidden class="text-foreground border-accent rounded-pill min-h-11 border px-5 font-semibold">{t.remove}</button>
         <button type="submit" class="rounded-pill bg-primary text-primary-foreground min-h-11 px-6">{t.save}</button>
         <button type="button" data-check-publication hidden class="rounded-pill border-border min-h-11 border px-5">{t.checkPublication}</button>
         <details><summary class="min-h-11 cursor-pointer py-3">{t.preview}</summary><div data-preview class="bg-card rounded-card p-5"></div></details>
+      <p class="bcms-form-msg" hidden></p>
       </form>
+      <script is:inline>
+function bcmsPhone(cc,raw,trunk){var d=String(raw||'').trim();if(!d)return '';if(d.charAt(0)==='+'){var i=d.replace(/D/g,'');return i?'+'+i:'';}if(!cc)return d;var n=d.replace(/D/g,'');if(trunk&&n.charAt(0)==='0')n=n.slice(1);return n?'+'+cc+n:'';}
+document.querySelectorAll('form[data-bcms-form]').forEach(function(f){
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    var msg=f.querySelector('.bcms-form-msg');
+    var data={};
+    // A checkboxes group posts one entry per checked box under the SAME name; the old
+    // one-at-a-time assignment kept only the last, so "pick many" delivered one answer.
+    // One checked box still arrives as a scalar — FormData cannot tell a group from a
+    // lone field — which is exactly why lib/forms/validate.ts's chosenValues() accepts
+    // both an array and a comma string.
+    new FormData(f).forEach(function(v,k){
+      if(k==='cf-turnstile-response')return;
+      if(Object.prototype.hasOwnProperty.call(data,k))data[k]=(Array.isArray(data[k])?data[k]:[data[k]]).concat(v);
+      else data[k]=v;
+    });
+    // Country-picker phone fields post ONE key. The __country select is scaffolding: it is
+    // composed into the field's own value here, AFTER collection, so a showIf that points at a
+    // phone key still compares the raw digits. Then it is removed from the body.
+    f.querySelectorAll('select[name$="__country"]').forEach(function(sel){
+      var k=sel.name.slice(0,-9);
+      var o=sel.options[sel.selectedIndex];
+      data[k]=bcmsPhone(o?(o.getAttribute('data-cc')||''):'',data[k],o?o.getAttribute('data-trunk')==='1':false);
+      delete data[k+'__country'];
+    });
+    var body={data:data};
+    var tok=f.querySelector('[name="cf-turnstile-response"]');
+    if(tok&&tok.value)body['cf-turnstile-response']=tok.value;
+    fetch(f.action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){return r.ok;})
+      .then(function(ok){if(msg){msg.hidden=false;msg.textContent=ok?(f.getAttribute('data-bcms-form-success')||'Thanks! Your submission was received.'):'Sorry, something went wrong.';}if(ok)f.reset();})
+      .catch(function(){if(msg){msg.hidden=false;msg.textContent='Sorry, something went wrong.';}});
+  });
+});
+</script>
     </div>
   </section>
   <script>import "@components/Sections/BackOffice/editor";</script>

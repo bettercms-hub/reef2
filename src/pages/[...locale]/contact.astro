@@ -62,9 +62,9 @@ const crumbs = breadcrumbList([
             {t.contact.formTitle}
           </h2>
 
-          <form class="mt-7 flex flex-col gap-5" name="contact" aria-describedby="contact-note">
+          <form class="mt-7 flex flex-col gap-5" name="contact" aria-describedby="contact-note" action="https://api.bettercms.ai/api/v1/forms/public/9ebba909-7dd6-4e30-8412-00bb79d38479/submissions" method="post" data-bcms-form="9ebba909-7dd6-4e30-8412-00bb79d38479" data-bcms-form-success="Thank you for your submission!">
             <div class="grid gap-5 sm:grid-cols-2">
-              <p class="flex flex-col gap-2">
+              <p class="flex flex-col gap-2" data-bcms-form-field="name">
                 <Label for="contact-name" required>{t.contact.nameLabel}</Label>
                 <Input
                   id="contact-name"
@@ -75,7 +75,7 @@ const crumbs = breadcrumbList([
                   required
                 />
               </p>
-              <p class="flex flex-col gap-2">
+              <p class="flex flex-col gap-2" data-bcms-form-field="email">
                 <Label for="contact-email" required>{t.contact.emailLabel}</Label>
                 <Input
                   id="contact-email"
@@ -89,7 +89,7 @@ const crumbs = breadcrumbList([
               </p>
             </div>
 
-            <p class="flex flex-col gap-2">
+            <p class="flex flex-col gap-2" data-bcms-form-field="subject">
               <Label for="contact-subject">{t.contact.subjectLabel}</Label>
               <Input
                 id="contact-subject"
@@ -99,7 +99,7 @@ const crumbs = breadcrumbList([
               />
             </p>
 
-            <p class="flex flex-col gap-2">
+            <p class="flex flex-col gap-2" data-bcms-form-field="message">
               <Label for="contact-message" required>{t.contact.messageLabel}</Label>
               <Textarea
                 id="contact-message"
@@ -120,7 +120,44 @@ const crumbs = breadcrumbList([
                 <Icon name="send" size={17} />
               </Button>
             </div>
+          <p class="bcms-form-msg" hidden></p>
           </form>
+          <script is:inline>
+function bcmsPhone(cc,raw,trunk){var d=String(raw||'').trim();if(!d)return '';if(d.charAt(0)==='+'){var i=d.replace(/D/g,'');return i?'+'+i:'';}if(!cc)return d;var n=d.replace(/D/g,'');if(trunk&&n.charAt(0)==='0')n=n.slice(1);return n?'+'+cc+n:'';}
+document.querySelectorAll('form[data-bcms-form]').forEach(function(f){
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    var msg=f.querySelector('.bcms-form-msg');
+    var data={};
+    // A checkboxes group posts one entry per checked box under the SAME name; the old
+    // one-at-a-time assignment kept only the last, so "pick many" delivered one answer.
+    // One checked box still arrives as a scalar — FormData cannot tell a group from a
+    // lone field — which is exactly why lib/forms/validate.ts's chosenValues() accepts
+    // both an array and a comma string.
+    new FormData(f).forEach(function(v,k){
+      if(k==='cf-turnstile-response')return;
+      if(Object.prototype.hasOwnProperty.call(data,k))data[k]=(Array.isArray(data[k])?data[k]:[data[k]]).concat(v);
+      else data[k]=v;
+    });
+    // Country-picker phone fields post ONE key. The __country select is scaffolding: it is
+    // composed into the field's own value here, AFTER collection, so a showIf that points at a
+    // phone key still compares the raw digits. Then it is removed from the body.
+    f.querySelectorAll('select[name$="__country"]').forEach(function(sel){
+      var k=sel.name.slice(0,-9);
+      var o=sel.options[sel.selectedIndex];
+      data[k]=bcmsPhone(o?(o.getAttribute('data-cc')||''):'',data[k],o?o.getAttribute('data-trunk')==='1':false);
+      delete data[k+'__country'];
+    });
+    var body={data:data};
+    var tok=f.querySelector('[name="cf-turnstile-response"]');
+    if(tok&&tok.value)body['cf-turnstile-response']=tok.value;
+    fetch(f.action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){return r.ok;})
+      .then(function(ok){if(msg){msg.hidden=false;msg.textContent=ok?(f.getAttribute('data-bcms-form-success')||'Thanks! Your submission was received.'):'Sorry, something went wrong.';}if(ok)f.reset();})
+      .catch(function(){if(msg){msg.hidden=false;msg.textContent='Sorry, something went wrong.';}});
+  });
+});
+</script>
         </div>
       </section>
 
