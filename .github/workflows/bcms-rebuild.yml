@@ -378,6 +378,22 @@ jobs:
             echo "no build output dir — packaging the repo root as a static site"
             BUILD_DIR="."
           fi
+          # bcms:ssr-guard:start
+          # An Astro SERVER build is never a static site, however its directory was chosen. Its
+          # output is dist/client + dist/server with no index.html at the root, so served as files
+          # every route answers 404 while the build, the release and the deploy all read green.
+          # Two ways here picked it anyway: BCMS_BUILD_DIR=dist (which skipped the server check
+          # below), and a server build that prerenders a page, whose dist/client/*.html satisfied
+          # the any-HTML fallback. Chosen by the scan → hand it to the server branch. Chosen by
+          # the override → the customer asked for exactly this, so refuse it by name.
+          if [ -n "$BUILD_DIR" ] && [ "$BUILD_DIR" != "." ] && [ -f dist/server/entry.mjs ] && [ ! -f "$BUILD_DIR/index.html" ]; then
+            if [ -n "${BUILD_DIR_OVERRIDE:-}" ]; then
+              echo "::error::STATIC_HOST_GOT_SSR_ARTIFACT: BCMS_BUILD_DIR='$BUILD_DIR' holds an Astro server build (dist/server/entry.mjs) with no index.html at its root — served as a static site, every route would answer 404. Unset BCMS_BUILD_DIR so it is packaged as a server app, then switch this project to 'Run as a server app' on the Hosting page. Or build a static site (output: 'static')."; exit 1
+            fi
+            echo "::warning::dist holds an Astro server build — packaging it as a server app. It runs only once this project is set to Run as a server app on the Hosting page; until then only its prerendered pages and assets are served."
+            BUILD_DIR=""
+          fi
+          # bcms:ssr-guard:end
           # ── Server runtime (FLO-947 Phase B) ───────────────────────────────────────
           # Reached only when every static path above came up empty, so a repo that
           # deploys today is packaged byte-identically. Opt-in is the customer's
